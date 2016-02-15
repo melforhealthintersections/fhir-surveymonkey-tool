@@ -1,31 +1,70 @@
 var express = require('express');
+var http = require('http');
+var https = require('https');
 var router = express.Router();
+var qs = require('querystring');
+var log = '';
 
-/* GET home page. */
-router.get('/', function(req, res, next) {
-  // convert the code to a token
-  //
+// adapted from https://nodejs.org/api/http.html#http_http_request_options_callback
+function completeOAuthLogin(url, res) {
 
-  var log = '';
+  var postData = qs.stringify({
+    'client_secret' : 'ed5btDPdNQXg63kud2xuaHM2Qp3P38ej',
+    'client_id' : 'ed5btDPdNQXg63kud2xuaHM2Qp3P38ej',
+    'code' : url.substring(url.indexOf('code=')+5),
+    'redirect_uri' : 'http://localhost:3000/select.html',
+    'client_id' : 'sm_grahameg_gmail_com',
+    'grant_type' : 'authorization_code'
+  });
+
+  var options = {
+    hostname: 'api.surveymonkey.net',
+    protocol: 'https:',
+    path: '/oauth/token?api_key=hxw4mq8t66cmhvg8rj6h8ffd',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': postData.length
+    }
+  };
+
+  var req = https.request(options, function(response) {
+    log += 'STATUS: ${res.statusCode}\r\n';
+    log += 'HEADERS: ${JSON.stringify(res.headers)}\r\n';
+    response.setEncoding('utf8');
+    var body = '';
+    response.on('data', function(d) {
+      body += d;
+    });
+    response.on('end', function() {
+      log += body+'\r\n';
+      var json = JSON.parse(body);
+      if (json.error)
+        res.render('error', { error: null, message: json.error_description});
+      else
+        res.render('select', { title: 'TEST', json: body });
+    });
+  });
+
+  req.on('error', function (e) {
+    log += 'problem with request: ${e.message}\r\n';
+  });
+
+  // write data to request body
+  req.write(postData);
+  req.end();
+};
+
+router.get('/select.html', function(req, res, next) {
 
   try {
-    var s = document.URL
-    log += s.substring(s.indexOf('code=') + 5)+'\r\n';
-    var xhttp = new XMLHttpRequest();
-    log += 'still going'+'\r\n';
-    xhttp.open("POST", "https://api.surveymonkey.net/oauth/token?api_key=hxw4mq8t66cmhvg8rj6h8ffd", false);
-    log += 'and still going again'+'\r\n';
-    xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-    log += 'and still going again and again'+'\r\n';
-    xhttp.send("client_secret=ed5btDPdNQXg63kud2xuaHM2Qp3P38ej&code=ox40W0Of9q0CBecUS30iO8-AjawM1bVfQ01tyoXV46Loyit6P5w5ScpR.DN36aIMHzoC3e-PCfnAKvBEmOoY00g2wxf7k-i-ffnzZxvX1j.QHvG7DdyOyEKdbPYMl4TjgKjs4TvOSHf5gENGJBAWMq6t0BnGImgUHQh8LF0K-JrGzG4xHr6kFx5.HKiUXNFlx947phfrSPbBdUXaOy5t1g%3D%3D&redirect_uri=http%3A%2F%2Flocalhost%3A63342%2Ffhir-surveymonkey-tool%2Fselect.html&grant_type=authorization_code");
-    log += xhttp.status+'\r\n';
-    log += xhttp.responseText+'\r\n';
+    var json = completeOAuthLogin(req.url, res);
   }
   catch (err) {
     log += err+'\r\n';
+    res.render('error', { error: err, message: "oh no"});
   }
-  // now, we inject the survery list into tha page, and send it off.
-  res.render('select', { title: log });
 });
+
 
 module.exports = router;
